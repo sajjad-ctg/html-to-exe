@@ -18,7 +18,7 @@ marketplaces.
 
 ## Roadmap
 
-- [ ] **v1** — Windows builder, both output modes, title + icon settings, zip validation
+- [x] **v1** — Windows builder, both output modes, title + icon settings, zip validation
 - [ ] **v1.1** — Code-signing support, fully standalone (bundled WebView2) build option
 - [ ] **v1.2** — Accept `.png` icons (auto-resize to 256/128/64/48/32/16 and pack into an ICO alongside `.ico` passthrough)
 - [ ] **v2** — Window settings (resolution, borderless), splash screen, CLI mode
