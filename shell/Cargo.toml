@@ -27,6 +27,10 @@ percent-encoding = "2.1"
 # Ergonomic error handling
 anyhow = "1"
 
+[build-dependencies]
+# Embeds assets/default.ico + version info into the exe resource section.
+winresource = "0.1"
+
 [profile.release]
 lto = "thin"
 strip = true

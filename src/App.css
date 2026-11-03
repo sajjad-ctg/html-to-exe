@@ -302,6 +302,26 @@ field button,
   font-size: 12.5px;
   line-height: 1.5;
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reveal {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.reveal:hover {
+  border-color: var(--accent);
 }
 
 .status.ok {

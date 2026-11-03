@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
 const THEME_KEY = "htx-theme";
@@ -33,6 +34,7 @@ function App() {
   const [mode, setMode] = useState("single"); // single | folder
   const [status, setStatus] = useState("idle"); // idle | building | done | error
   const [statusDetail, setStatusDetail] = useState("");
+  const [resultPath, setResultPath] = useState("");
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -49,6 +51,9 @@ function App() {
     setZipInfo(null);
     setInspectError("");
     setTitle(prettyName(picked));
+    setResultPath("");
+    setStatus("idle");
+    setStatusDetail("");
     try {
       const info = await invoke("inspect_zip", { path: picked });
       setZipInfo(info);
@@ -65,7 +70,27 @@ function App() {
     if (picked) setIconPath(picked);
   }
 
-  const canBuild = Boolean(zipPath) && Boolean(zipInfo?.entry) && title.trim().length > 0;
+  async function build() {
+    setStatus("building");
+    setStatusDetail("starting…");
+    try {
+      const result = await invoke("export", {
+        zipPath,
+        title: title.trim(),
+        iconPath: iconPath || null,
+        mode,
+        onProgress: (message) => setStatusDetail(message),
+      });
+      setStatus("done");
+      setStatusDetail(result.path);
+      setResultPath(result.path);
+    } catch (error) {
+      setStatus("error");
+      setStatusDetail(String(error));
+    }
+  }
+
+  const canBuild = Boolean(zipPath) && Boolean(zipInfo?.entry) && title.trim().length > 0 && !resultPath;
 
   return (
     <main class="app">
@@ -154,13 +179,18 @@ function App() {
           </div>
         </div>
 
-        <button class="build" disabled={!canBuild || status === "building"}>
-          {status === "building" ? "Building…" : "Build"}
+        <button class="build" disabled={!canBuild || status === "building"} onClick={build}>
+          {status === "building" ? "Building…" : resultPath ? "Built ✓ — pick again to export anew" : "Build"}
         </button>
 
         {statusDetail && (
           <p class={`status ${status === "error" ? "bad" : status === "done" ? "ok" : ""}`}>
             {statusDetail}
+            {status === "done" && resultPath && (
+              <button class="reveal" onClick={() => revealItemInDir(resultPath)}>
+                Show in Explorer
+              </button>
+            )}
           </p>
         )}
 
