@@ -1,0 +1,340 @@
+/* ---------------------------------------------------------------------------
+   html-to-exe builder styles.
+   Light/dark theming through CSS custom properties on [data-theme];
+   everything adaptive lives in the `:root` / `--` list below.
+--------------------------------------------------------------------------- */
+
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --text: #24292f;
+  --muted: #707787;
+  --border: #d7dbe1;
+  --accent: #3560b7;
+  --accent-hover: #2c529e;
+  --on-accent: #ffffff;
+  --ok: #1a7f4b;
+  --bad: #c0392b;
+  --shadow: 0 8px 30px rgb(20 30 60 / 0.08);
+  --radius: 10px;
+}
+
+:root[data-theme="dark"] {
+  --bg: #16181d;
+  --surface: #1f2229;
+  --surface-2: #272b34;
+  --text: #e7eaf0;
+  --muted: #9aa1ae;
+  --border: #333945;
+  --accent: #6f97ff;
+  --accent-hover: #86a9ff;
+  --on-accent: #10131a;
+  --ok: #46c07f;
+  --bad: #f2705c;
+  --shadow: 0 8px 30px rgb(0 0 0 / 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, "Segoe UI", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  transition: background 0.2s ease, color 0.2s ease;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 14px 18px;
+  gap: 12px;
+}
+
+/* ---------------------------------------------------------------- topbar */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.2px;
+}
+
+.brand-dim {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.theme-toggle {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11.5px;
+  margin-top: auto;
+}
+
+/* ------------------------------------------------------------------ card */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+}
+
+/* ------------------------------------------------------------ drop zone */
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  padding: 18px 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.dropzone:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.dropzone.picked {
+  border-style: solid;
+}
+
+.dropzone-big {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dropzone-name {
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.dropzone-meta {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ---------------------------------------------------------------- fields */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.field-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.field-row .field {
+  flex: 1;
+}
+
+.grow {
+  flex: 1;
+}
+
+.field input,
+field button,
+.field-row button.pick {
+  font: inherit;
+}
+
+.field input {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s ease;
+  user-select: text;
+}
+
+.field input:focus {
+  border-color: var(--accent);
+}
+
+.field button.pick {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: border-color 0.15s ease;
+}
+
+.field button.pick:hover {
+  border-color: var(--accent);
+}
+
+.icon-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.icon-clear:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+
+/* ------------------------------------------------------------- segmented */
+
+.segmented {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+
+.seg {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.seg.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+:root[data-theme="dark"] .seg.active {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+
+/* ----------------------------------------------------------- build button */
+
+.build {
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 650;
+  padding: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.build:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.build:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------- status */
+
+.status {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  word-break: break-word;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reveal {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.reveal:hover {
+  border-color: var(--accent);
+}
+
+.status.ok {
+  color: var(--ok);
+}
+
+.status.bad {
+  color: var(--bad);
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
