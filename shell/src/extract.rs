@@ -21,7 +21,7 @@ pub struct Cache {
 /// starts from a clean slate.
 fn key(exe: &Path) -> String {
     let text = exe.display().to_string();
-    format!("{:016x}", fnv1a_hex(text.as_bytes()))
+    fnv1a_hex(text.as_bytes())
 }
 
 impl Cache {
@@ -71,7 +71,7 @@ fn extract_zip(bytes: &[u8], into: &Path) -> Result<()> {
 
     for index in 0..archive.len() {
         let mut file = archive.by_index(index)?;
-        let path = into.join(file.mangled_name());
+        let path = into.join(file.mangled_name()?);
 
         if file.is_dir() {
             fs::create_dir_all(&path)?;

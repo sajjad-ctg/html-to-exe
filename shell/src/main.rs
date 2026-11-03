@@ -23,6 +23,6 @@ fn main() {
 
 fn launch() -> anyhow::Result<()> {
     let source = embed::Source::resolve()?;
-    let content = source.content_dir()?;
-    webview::run(source.config(), &content)
+    let (content, data_dir) = source.content_and_data()?;
+    webview::run(source.config(), &content, data_dir)
 }

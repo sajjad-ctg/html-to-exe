@@ -71,15 +71,17 @@ impl Source {
         )
     }
 
-    /// Produce the directory the webview should load content from.
-    /// For embedded mode this extracts into the user-local cache when the
-    /// archive changed since the last run.
-    pub fn content_dir(&self) -> Result<PathBuf> {
+    /// Materialize the payload: content directory for the webview plus
+    /// the data directory for webview storage (player saves).
+    pub fn content_and_data(&self) -> Result<(PathBuf, PathBuf)> {
+        let cache = Cache::new()?;
         match self {
-            Source::Folder { content, .. } => Ok(content.clone()),
-            Source::Embedded { config, game } => {
-                let cache = Cache::new()?;
-                cache.ensure(game)
+            Source::Folder { content, .. } => {
+                Ok((content.clone(), cache.webview_data_dir()))
+            }
+            Source::Embedded { game, .. } => {
+                let content = cache.ensure(game)?;
+                Ok((content, cache.webview_data_dir()))
             }
         }
     }

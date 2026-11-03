@@ -14,8 +14,11 @@ path = "src/main.rs"
 # Window + webview
 tao = "0.37"
 wry = "0.57"
-# Embedded zip handling (no extra compressors; HTML5 zips use deflate/stored)
+# Embedded zip handling. `zip` pulls `flate2` feature-gated without a
+# backend, so we pin one: the pure-Rust backend (no C linkage, no
+# cross-compile surprises, and small enough not to matter here).
 zip = { version = "9.3", default-features = false, features = ["deflate-flate2", "deflate64"] }
+flate2 = { version = "1", default-features = true }
 # Config parsing
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
