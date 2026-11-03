@@ -1,0 +1,25 @@
+# Rust
+shell/target/
+src-tauri/target/
+target/
+*.wasm
+
+# Tauri
+src-tauri/gen/
+
+# Node / frontend
+node_modules/
+dist/
+*.local
+
+# Logs
+*.log
+
+# OS artifacts
+Thumbs.db
+.DS_Store
+
+# XLMRC / editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
