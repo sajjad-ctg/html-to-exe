@@ -1,0 +1,16 @@
+# Normalize all text files to LF in the repo; git handles checkout per-OS
+* text=auto
+
+# Shell scripts and configs must keep LF
+*.sh text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# Windows batch files must keep CRLF
+*.bat text eol=crlf
+
+# Binary assets
+*.png binary
+*.ico binary
+*.zip binary
+*.exe binary
