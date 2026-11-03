@@ -39,6 +39,24 @@ html-to-exe/
 - Releases: tagged `v1.0.0`, `v1.1.0`, ... with GitHub Releases
 - Roadmap items tracked above and via GitHub Issues
 
+## Development
+
+```
+cd shell
+cargo test                  # unit tests (embed format, hashing)
+cargo build --release       # produces game-shell.exe
+```
+
+Regression harness for the export pipeline (builds both export modes from
+a synthetic game, launches them, checks they stay alive):
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\test-payload.ps1 -Mode folder
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\test-payload.ps1 -Mode embedded
+```
+
+The single-file append layout is specified in [docs/format.md](docs/format.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

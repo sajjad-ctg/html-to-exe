@@ -1,0 +1,33 @@
+[package]
+name = "html-to-exe-shell"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Portable WebView2 shell that hosts embedded HTML5 games/apps."
+repository = "https://github.com/sajjad-ctg/html-to-exe"
+
+[[bin]]
+name = "game-shell"
+path = "src/main.rs"
+
+[dependencies]
+# Window + webview
+tao = "0.37"
+wry = "0.57"
+# Embedded zip handling. `zip` pulls `flate2` feature-gated without a
+# backend, so we pin one: the pure-Rust backend (no C linkage, no
+# cross-compile surprises, and small enough not to matter here).
+zip = { version = "9.3", default-features = false, features = ["deflate-flate2", "deflate64"] }
+flate2 = { version = "1", default-features = true }
+# Config parsing
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# URL path handling for the custom protocol
+percent-encoding = "2.1"
+# Ergonomic error handling
+anyhow = "1"
+
+[profile.release]
+lto = "thin"
+strip = true
+panic = "abort"
