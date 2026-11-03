@@ -24,8 +24,9 @@ export default defineConfig(() => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching `src-tauri` and Rust build
+      //    trees (watching hundreds of build artifacts causes EBUSY)
+      ignored: ["**/src-tauri/**", "**/shell/target/**", "**/dist/**", "**/node_modules/**"],
     },
   },
 }));
