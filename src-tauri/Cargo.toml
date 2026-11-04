@@ -6,6 +6,8 @@ authors = ["Mohammad Sajjad Khan (MSKCTG)"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/sajjad-ctg/html-to-exe"
+# The htx CLI is a second bin; tell tauri (and cargo) which one is the app.
+default-run = "html-to-exe-builder"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
