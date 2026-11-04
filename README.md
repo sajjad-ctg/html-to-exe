@@ -4,6 +4,21 @@ A free & open-source desktop app that converts a `.zip` of an HTML5 game/app
 into a portable `.exe` — ready for distribution on Steam, itch.io, and other
 marketplaces.
 
+## Download
+
+Grab the latest build from
+[Releases](https://github.com/sajjad-ctg/html-to-exe/releases/latest):
+
+| File | For |
+|------|-----|
+| `html-to-exe_x64-setup.exe` | most users — install once (NSIS) |
+| `html-to-exe_x64_en-US.msi` | managed/enterprise installs |
+| `html-to-exe_x64_portable.zip` | no install — unzip and run |
+
+Note: builds are unsigned at this stage, so Windows SmartScreen may show
+a warning on first run (choose *More info → Run anyway*). Exported game
+exes open at 1280×720, resizable, with F11 fullscreen.
+
 - **Builder app:** Tauri 2 (Rust backend + minimal web UI, light/dark theme)
 - **Game shell:** tiny Rust binary using `wry` (WebView2), reused by both output modes
 - **Platforms (v1):** Windows
@@ -47,6 +62,13 @@ html-to-exe/
 cd shell
 cargo test                  # unit tests (embed format, hashing)
 cargo build --release       # produces game-shell.exe
+```
+
+Keep the machine lean: dev-mode debug trees grow fast (5–10 GB per crate
+is normal), and the next build regenerates everything:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean-dev.ps1
 ```
 
 Regression harness for the export pipeline (builds both export modes from
