@@ -81,19 +81,124 @@ fn scan_zip<R: Read + Seek>(input: &mut R) -> Result<ZipInfo, String> {
     Ok(info)
 }
 
-/// Read metadata from a chosen zip without extracting it.
-#[tauri::command]
-fn inspect_zip(path: &str) -> Result<ZipInfo, String> {
+/// Read metadata from a chosen zip without extracting it. Shared by
+/// the app command and the CLI.
+pub fn inspect_zip_file(path: &str) -> Result<ZipInfo, String> {
     let file = std::fs::File::open(path).map_err(|e| format!("cannot open: {e}"))?;
     scan_zip(&mut BufReader::new(file))
 }
 
+/// Default window config for every v1 export; window settings become
+/// configurable in v2 (see README roadmap).
+fn build_config(title: &str, entry: &str) -> Vec<u8> {
+    let config = serde_json::json!({
+        "title": title.trim(),
+        "width": 1280,
+        "height": 720,
+        "resizable": true,
+        "fullscreen": false,
+        "entry": entry,
+    });
+    serde_json::to_vec(&config).expect("config is valid json")
+}
+
 /// Run the full export for one choice of zip/title/icon/mode.
 ///
-/// `on_progress` receives short human-readable step labels through the
-/// Tauri Channel -> the UI renders each as it lands.
+/// Used by both the app command (with a progress Channel) and the CLI
+/// (`htx` bin, with println progress). Progress receives short
+/// human-readable step labels.
+///
+/// Returns the path of the produced exe in both modes. For folder mode
+/// the exe sits inside the export folder beside `game/` and
+/// `config.json`.
+pub fn export_zip(
+    zip_path: &str,
+    title: &str,
+    icon_path: Option<&str>,
+    mode: &str,
+    out_dir: Option<&Path>,
+    progress: impl Fn(&str),
+) -> Result<ExportResult, String> {
+    if !matches!(mode, "single" | "folder") {
+        return Err(format!("unknown mode '{mode}'"));
+    }
+    if title.trim().is_empty() {
+        return Err("title must not be empty".into());
+    }
+    progress(&format!("validating {zip_path}"));
+
+    // Re-validate in the backend: never trust a frontend snapshot.
+    let zip_bytes = std::fs::read(zip_path).map_err(|e| format!("cannot read zip: {e}"))?;
+    let info = scan_zip(&mut Cursor::new(&zip_bytes))?;
+    let entry = info.entry.ok_or("zip has no usable index.html")?;
+
+    let base_dir = match out_dir {
+        Some(dir) => dir.to_path_buf(),
+        None => Path::new(zip_path)
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(std::env::temp_dir),
+    };
+    std::fs::create_dir_all(&base_dir).map_err(|e| format!("mkdir: {e}"))?;
+
+    let base = export::slugify(title);
+    let exists = |p: &Path| p.exists();
+    progress("writing shell");
+
+    if mode == "single" {
+        let out = unique_candidate(&base_dir, &base, ".exe", &exists);
+
+        // Order matters: the icon patch rewrites the resource section,
+        // which would relocate an appended footer — so patch first,
+        // assemble + append payload second.
+        write_new(&out, export::SHELL_TEMPLATE)?;
+        if let Some(icon) = icon_path {
+            progress("embedding icon");
+            patch_icon(&out, Path::new(icon))?;
+        }
+
+        progress("attaching game archive");
+        let config_json = build_config(title, &entry);
+
+        // Re-read: after patching, the on-disk bytes are the true shell.
+        let patched_shell = std::fs::read(&out).map_err(|e| format!("re-read: {e}"))?;
+        let payload = assemble_single(&patched_shell, &zip_bytes, &config_json);
+        std::fs::write(&out, payload).map_err(|e| format!("write: {e}"))?;
+
+        progress("done");
+        Ok(ExportResult {
+            path: out.display().to_string(),
+            kind: mode.to_string(),
+        })
+    } else {
+        let export_dir = export::folder_name(&base_dir, &base, &exists);
+        std::fs::create_dir(&export_dir).map_err(|e| format!("mkdir: {e}"))?;
+
+        let exe = export_dir.join(format!("{base}.exe"));
+        write_new(&exe, export::SHELL_TEMPLATE)?;
+        if let Some(icon) = icon_path {
+            progress("embedding icon");
+            patch_icon(&exe, Path::new(icon))?;
+        }
+
+        progress("extracting game");
+        let game_dir = export_dir.join("game");
+        std::fs::create_dir(&game_dir).map_err(|e| format!("mkdir: {e}"))?;
+        extract_game(&zip_bytes, &game_dir)?;
+
+        let config_json = build_config(title, &entry);
+        write_new(&export_dir.join("config.json"), &config_json)?;
+
+        progress("done");
+        Ok(ExportResult {
+            path: exe.display().to_string(),
+            kind: mode.to_string(),
+        })
+    }
+}
+
+/// App command wrapper: progress flows to the UI through a Channel.
 #[tauri::command]
-#[allow(clippy::too_many_arguments)]
 async fn export(
     zip_path: String,
     title: String,
@@ -101,94 +206,19 @@ async fn export(
     mode: String,
     on_progress: tauri::ipc::Channel<String>,
 ) -> Result<ExportResult, String> {
-    if !matches!(mode.as_str(), "single" | "folder") {
-        return Err(format!("unknown mode '{mode}'"));
-    }
-    if title.trim().is_empty() {
-        return Err("title must not be empty".into());
-    }
-    on_progress.send(format!("validating {zip_path}")).ok();
-
-    // Re-validate in the backend: never trust the frontend's snapshot.
-    let zip_bytes = std::fs::read(&zip_path).map_err(|e| format!("cannot read zip: {e}"))?;
-    let info = scan_zip(&mut Cursor::new(&zip_bytes))?;
-    let entry = info.entry.ok_or("zip has no usable index.html")?;
-
-    let zip_dir = Path::new(&zip_path)
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(std::env::temp_dir);
-
-    let base = export::slugify(&title);
-    let exists = |p: &Path| p.exists();
-    on_progress.send("writing shell".into()).ok();
-
-    if mode == "single" {
-        let out = unique_candidate(&zip_dir, &base, ".exe", &exists);
-
-        // Order matters: the icon patch rewrites the resource section,
-        // which would relocate an appended footer — so patch first,
-        // assemble + append payload second.
-        write_new(&out, export::SHELL_TEMPLATE)?;
-        if let Some(icon) = &icon_path {
-            on_progress.send("embedding icon".into()).ok();
-            patch_icon(&out, Path::new(icon))?;
-        }
-
-        on_progress.send("attaching game archive".into()).ok();
-        let config = serde_json::json!({
-            "title": title.trim(),
-            "width": 1280,
-            "height": 720,
-            "resizable": true,
-            "fullscreen": false,
-            "entry": entry,
-        });
-        let config_json = serde_json::to_vec(&config).expect("config is valid json");
-
-        // Re-read: after patching, the on-disk bytes are the true shell.
-        let patched_shell = std::fs::read(&out).map_err(|e| format!("re-read: {e}"))?;
-        let payload = assemble_single(&patched_shell, &zip_bytes, &config_json);
-        std::fs::write(&out, payload).map_err(|e| format!("write: {e}"))?;
-
-        on_progress.send("done".into()).ok();
-        Ok(ExportResult {
-            path: out.display().to_string(),
-            kind: mode,
+    tauri::async_runtime::spawn_blocking(move || {
+        export_zip(&zip_path, &title, icon_path.as_deref(), &mode, None, |message| {
+            on_progress.send(message.to_string()).ok();
         })
-    } else {
-        let out_dir = export::folder_name(&zip_dir, &base, &exists);
-        std::fs::create_dir(&out_dir).map_err(|e| format!("mkdir: {e}"))?;
+    })
+    .await
+    .map_err(|e| format!("export thread failed: {e:?}"))?
+}
 
-        let exe = out_dir.join(format!("{base}.exe"));
-        export::write_new(&exe, export::SHELL_TEMPLATE)?;
-        if let Some(icon) = &icon_path {
-            on_progress.send("embedding icon".into()).ok();
-            patch_icon(&exe, Path::new(icon))?;
-        }
-
-        on_progress.send("extracting game".into()).ok();
-        let game_dir = out_dir.join("game");
-        std::fs::create_dir(&game_dir).map_err(|e| format!("mkdir: {e}"))?;
-        extract_game(&zip_bytes, &game_dir)?;
-
-        let config = serde_json::json!({
-            "title": title.trim(),
-            "width": 1280,
-            "height": 720,
-            "resizable": true,
-            "fullscreen": false,
-            "entry": entry,
-        });
-        let config_json = serde_json::to_vec(&config).expect("config is valid json");
-        write_new(&out_dir.join("config.json"), &config_json)?;
-
-        on_progress.send("done".into()).ok();
-        Ok(ExportResult {
-            path: exe.display().to_string(),
-            kind: mode,
-        })
-    }
+/// App command wrapper for validation as chosen in the UI.
+#[tauri::command]
+fn inspect_zip(path: &str) -> Result<ZipInfo, String> {
+    inspect_zip_file(path)
 }
 
 #[cfg(test)]
