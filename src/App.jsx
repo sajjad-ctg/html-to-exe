@@ -218,10 +218,15 @@ function App() {
           </p>
         )}
 
-        <p class="hint">
-          Inspecting and window settings come with sensible defaults. The exported exe
-          opens at 1280×720, resizable, with F11 fullscreen.
-        </p>
+        {/* The hint occupies floor space only while there is no zip:
+            once picked, the build status line takes its place so the
+            card never outgrows the window (no scrolling). */}
+        {!zipPath && (
+          <p class="hint">
+            Inspecting and window settings come with sensible defaults. The exported exe
+            opens at 1280×720, resizable, with F11 fullscreen.
+          </p>
+        )}
       </section>
 
       <footer class="foot">
