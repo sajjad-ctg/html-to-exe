@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import "./App.css";
@@ -41,12 +42,7 @@ function App() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  async function pickZip() {
-    const picked = await open({
-      multiple: false,
-      filters: [{ name: "HTML5 build (zip)", extensions: ["zip"] }],
-    });
-    if (!picked) return;
+  async function loadZip(picked) {
     setZipPath(picked);
     setZipInfo(null);
     setInspectError("");
@@ -62,6 +58,30 @@ function App() {
     }
   }
 
+  async function pickZip() {
+    const picked = await open({
+      multiple: false,
+      filters: [{ name: "HTML5 build (zip)", extensions: ["zip"] }],
+    });
+    if (picked) loadZip(picked);
+  }
+
+  // File drops from Explorer: with dragDropEnabled (Tauri default) the
+  // WebView2 native handler owns drags, so plain HTML5 drop events never
+  // fire here — listen through the webview API instead.
+  useEffect(() => {
+    let unlisten = () => {};
+    getCurrentWebview().onDragDropEvent((event) => {
+      if (event.payload.type !== "drop") return;
+      const zip = (event.payload.paths || []).find((p) => p.toLowerCase().endsWith(".zip"));
+      if (zip) loadZip(zip);
+      else setStatusDetail("dropped files ignored — drop a .zip");
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten();
+  }, []);
+
   async function pickIcon() {
     const picked = await open({
       multiple: false,
@@ -74,12 +94,16 @@ function App() {
     setStatus("building");
     setStatusDetail("starting…");
     try {
+      // Progress must travel through a Tauri Channel (a plain callback
+      // is not serializable across IPC and would arrive as "missing").
+      const progress = new Channel();
+      progress.onmessage = (message) => setStatusDetail(message);
       const result = await invoke("export", {
         zipPath,
         title: title.trim(),
         iconPath: iconPath || null,
         mode,
-        onProgress: (message) => setStatusDetail(message),
+        onProgress: progress,
       });
       setStatus("done");
       setStatusDetail(result.path);
@@ -127,7 +151,7 @@ function App() {
             </>
           ) : (
             <>
-              <span class="dropzone-big">Click to choose a .zip</span>
+              <span class="dropzone-big">Click to choose a .zip — or drag one here</span>
               <span class="dropzone-meta">any HTML5 game or app build</span>
             </>
           )}
