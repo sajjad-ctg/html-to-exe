@@ -1,0 +1,82 @@
+:root {
+  --neon: #6f97ff;
+  --bg: #0a0d16;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+#stage {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgb(111 151 255 / 0.25);
+}
+
+canvas {
+  display: block;
+  background: radial-gradient(120% 120% at 50% 0%, #131a2e 0%, #0a0d16 70%);
+}
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 16px;
+  color: #cfd7ef;
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+#hud span { text-shadow: 0 0 8px rgb(111 151 255 / 0.6); }
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  text-align: center;
+  background: rgb(10 13 22 / 0.82);
+  backdrop-filter: blur(2px);
+  color: #e7eaf0;
+}
+
+#overlay.hidden { display: none; }
+
+#ov-title {
+  margin: 0;
+  font-size: 44px;
+  letter-spacing: 6px;
+  color: var(--neon);
+  text-shadow: 0 0 24px rgb(111 151 255 / 0.8);
+}
+
+#ov-text { margin: 0; color: #98a1b8; font-size: 14px; }
+
+#ov-btn {
+  justify-self: center;
+  border: 0;
+  border-radius: 8px;
+  background: var(--neon);
+  color: #0a0d16;
+  font: inherit;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 10px 44px;
+  cursor: pointer;
+}
+
+#ov-btn:hover { filter: brightness(1.15); }

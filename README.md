@@ -19,9 +19,10 @@ marketplaces.
 ## Roadmap
 
 - [x] **v1** — Windows builder, both output modes, title + icon settings, zip validation
+- [x] **Early** — `htx` CLI (`inspect` / `export`), to support the demo export flow (was planned for v2)
 - [ ] **v1.1** — Code-signing support, fully standalone (bundled WebView2) build option
 - [ ] **v1.2** — Accept `.png` icons (auto-resize to 256/128/64/48/32/16 and pack into an ICO alongside `.ico` passthrough)
-- [ ] **v2** — Window settings (resolution, borderless), splash screen, CLI mode
+- [ ] **v2** — Window settings (resolution, borderless), splash screen, GUI option for what the CLI already covers
 - [ ] **v3** — macOS / Linux exports
 
 ## Project layout (planned)
@@ -57,6 +58,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\test-payload.ps1 -Mode
 ```
 
 The single-file append layout is specified in [docs/format.md](docs/format.md).
+
+## CLI
+
+Alongside the GUI there is a command line interface, built the same
+cargo project (`src-tauri`) that compiles the builder's backend:
+
+```
+cargo build --release --bin htx
+htx inspect <zip>
+htx export <zip> --title <TITLE> [--icon <ICO>] [--mode single|folder] [--out <DIR>]
+```
+
+`htx export` runs the identical export path as the UI (validation,
+icon patching, footer assembly) and prints the output path on success.
+`demo-game/` is a small working HTML5 game you can try it with:
+
+```
+htx export demo-game.zip --title "Neon Breakout" --mode single
+```
 
 ## License
 

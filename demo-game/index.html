@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neon Breakout</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="800" height="600"></canvas>
+    <div id="hud">
+      <span id="score">SCORE 0</span>
+      <span id="level">LEVEL 1</span>
+      <span id="lives">LIVES 3</span>
+      <span id="best">BEST 0</span>
+    </div>
+    <div id="overlay">
+      <h1 id="ov-title">NEON BREAKOUT</h1>
+      <p id="ov-text">Mouse or ←/→ to move · Space to launch · Esc to pause</p>
+      <button id="ov-btn">PLAY</button>
+    </div>
+  </div>
+  <script src="game.js"></script>
+</body>
+</html>
