@@ -2,14 +2,19 @@
 //!
 //! | Mode | Layout                                        | Detection                      |
 //! |------|-----------------------------------------------|--------------------------------|
-//! | A    | single exe: `[zip][config][footer]`           | 8-byte magic at end of exe     |
+//! | A    | single exe: `[zip][runtime?][config][footer]` | 8-byte magic at end of exe     |
 //! | B    | `game/` folder + `config.json` next to exe    | presence of `game/` directory  |
 //!
 //! Mode A is meant for itch.io-style single-file distribution; mode B is
 //! ideal for Steam (which uploads folders) and for debugging.
 //!
+//! The optional runtime blob (WebView2 auto-heal bootstrapper) sits
+//! directly before the config; its length rides in the config
+//! (`runtimeLen`), so the 16-byte footer layout never changes and the
+//! config is always locatable from the footer alone.
+//!
 //! Append layout (little endian, see `docs/format.md`):
-//! `\...zip bytes...\...config json bytes...\ config_len:u32 zip_len:u32 MAGIC(8) `
+//! `...zip bytes... ...runtime bytes?... ...config json bytes... config_len:u32 zip_len:u32 MAGIC(8)`
 
 use anyhow::{Context, Result, bail};
 use std::fs;
@@ -27,10 +32,12 @@ const FOOTER_LEN: usize = 16;
 /// Where the game content comes from, for a concrete launch.
 pub enum Source {
     /// Mode A: zip was embedded in the exe and needs cache extraction.
-    Embedded { config: GameConfig, game: Vec<u8> },
+    /// `runtime` is the optional WebView2 bootstrapper blob (empty in
+    /// plain single-file exports).
+    Embedded { config: GameConfig, game: Vec<u8>, runtime: Vec<u8> },
     /// Mode B: content already lives on disk next to the exe.
-    Folder { config: GameConfig, content: PathBuf },
-}
+    /// Folder exports carry no runtime blob (documented limitation).
+    Folder { config: GameConfig, content: PathBuf },}
 
 impl Source {
     /// The launch config for whichever mode was detected.
@@ -41,6 +48,16 @@ impl Source {
         }
     }
 
+    /// The embedded WebView2 bootstrapper, if this export carries one.
+    pub fn runtime(&self) -> Option<&[u8]> {
+        match self {
+            Source::Embedded { runtime, .. } => {
+                if runtime.is_empty() { None } else { Some(runtime) }
+            }
+            Source::Folder { .. } => None,
+        }
+    }
+
     /// Resolve which mode we are running in, based on exe contents and
     /// the files sitting next to the exe.
     pub fn resolve() -> Result<Self> {
@@ -48,8 +65,8 @@ impl Source {
         let exe_body = fs::read(&exe).with_context(|| format!("cannot read {}", exe.display()))?;
 
         if has_magic(&exe_body) {
-            if let Some((config, game)) = split_embedded(&exe_body) {
-                return Ok(Source::Embedded { config, game });
+            if let Some((config, game, runtime)) = split_embedded(&exe_body) {
+                return Ok(Source::Embedded { config, game, runtime });
             }
             // Footer-shaped bytes but not a real payload: the shell exe
             // happens to end with something magic-like. Ignore and try
@@ -121,9 +138,44 @@ mod tests {
         let config = br#"{"title":"poc"}"#;
         let body = build_body(&zip, config);
 
-        let (parsed, game) = split_embedded(&body).expect("should parse");
+        let (parsed, game, runtime) = split_embedded(&body).expect("should parse");
         assert_eq!(parsed.title, "poc");
         assert_eq!(game, zip);
+        assert!(runtime.is_empty(), "system exports carry no runtime blob");
+    }
+
+    #[test]
+    fn autoheal_payload_splits_with_runtime_blob() {
+        let zip = b"PK\x03\x04the game".to_vec();
+        let bootstrap = b"MZ-fake-bootstrapper-exe".to_vec();
+        let config_json = br#"{"title":"healed","webview2":"autoheal","runtimeLen":24}"#;
+        let mut body = b"pretend-shell-exe".to_vec();
+        body.extend(&zip);
+        body.extend(&bootstrap);
+        body.extend(config_json);
+        body.extend(footer(config_json.len() as u32, zip.len() as u32));
+
+        let (config, game, runtime) = split_embedded(&body).expect("should parse");
+        assert_eq!(config.title, "healed");
+        assert_eq!(game, zip);
+        assert_eq!(runtime, bootstrap);
+    }
+
+    #[test]
+    fn runtime_claimed_but_absent_is_rejected() {
+        let zip = b"PK\x03\x04game".to_vec();
+        // runtimeLen larger than the file could ever hold
+        let config_json = br#"{"title":"liar","webview2":"autoheal","runtimeLen":999999}"#;
+        let body = build_body(&zip, config_json);
+
+        assert!(split_embedded(&body).is_none());
+    }
+
+    #[test]
+    fn unknown_config_says_system_runtime() {
+        let config = GameConfig::from_json(r#"{"title":"x"}"#);
+        assert_eq!(config.webview2, "");
+        assert_eq!(config.runtime_len, 0);
     }
 
     #[test]
@@ -158,13 +210,13 @@ mod tests {
     }
 }
 
-/// Split an exe body into config and payload. Expects the exact layout
-/// documented in `docs/format.md`.
+/// Split an exe body into config, game zip and optional runtime blob.
+/// Expects the exact layout documented in `docs/format.md`.
 ///
 /// Returns `None` (instead of failing the launch) when the payload does
 /// not look like a zip archive: a bare shell exe can coincidentally end
 /// in magic-shaped bytes, and folder mode might still apply.
-fn split_embedded(exe_body: &[u8]) -> Option<(GameConfig, Vec<u8>)> {
+fn split_embedded(exe_body: &[u8]) -> Option<(GameConfig, Vec<u8>, Vec<u8>)> {
     const ZIP_SIGNATURE: [u8; 2] = [b'P', b'K'];
 
     let body = exe_body;
@@ -178,12 +230,30 @@ fn split_embedded(exe_body: &[u8]) -> Option<(GameConfig, Vec<u8>)> {
     let config_len = read_u32(0)? as usize;
     let zip_len = read_u32(4)? as usize;
 
-    let zip_start = footer_at
-        .checked_sub(config_len)?
-        .checked_sub(zip_len)?;
     if zip_len == 0 || config_len == 0 {
         return None;
     }
+
+    let config_start = footer_at.checked_sub(config_len)?;
+
+    // The config always sits directly before the footer, so it can be
+    // parsed first; the runtime blob length then tells us where the
+    // zip begins (auto-heal exports).
+    let config = GameConfig::from_json(
+        &String::from_utf8_lossy(&body[config_start..footer_at]),
+    );
+    let runtime_len = if config.webview2 == "autoheal" {
+        usize::try_from(config.runtime_len).ok()?
+    } else {
+        0
+    };
+
+    // Runtime blob directly before the config, zip directly before the
+    // runtime. If the config claimed a runtime that does not fit, the
+    // export is corrupt — checked_sub bails here (folder mode would
+    // only mask real breakage).
+    let runtime_start = config_start.checked_sub(runtime_len)?;
+    let zip_start = runtime_start.checked_sub(zip_len)?;
 
     // Strongest sanity check available without extra config: a real
     // payload always begins with the local-file-header signature.
@@ -191,14 +261,13 @@ fn split_embedded(exe_body: &[u8]) -> Option<(GameConfig, Vec<u8>)> {
         return None;
     }
 
-    let config = GameConfig::from_json(
-        &String::from_utf8_lossy(&body[footer_at - config_len..footer_at]),
-    );
-
-    // Stability over smartness: copying the slice out is negligible
+    // Stability over smartness: copying the slices out is negligible
     // compared to the extraction that follows.
     let mut game = Vec::with_capacity(zip_len);
     game.extend_from_slice(&body[zip_start..zip_start + zip_len]);
 
-    Some((config, game))
+    let mut runtime = Vec::with_capacity(runtime_len);
+    runtime.extend_from_slice(&body[runtime_start..runtime_start + runtime_len]);
+
+    Some((config, game, runtime))
 }

@@ -19,6 +19,13 @@ pub const FOOTER_LEN: usize = 16;
 /// when it changes.
 pub const SHELL_TEMPLATE: &[u8] = include_bytes!(env!("SHELL_TEMPLATE_PATH"));
 
+/// Microsoft's official WebView2 Evergreen bootstrapper, vendored for
+/// the auto-heal feature ("WebView2 runtime: Auto-heal" exports).
+/// Signature-verified on import (Microsoft Corporation, SHA-256
+/// CF2F2445FEF0C5C14E372045F84998771EEB8BB01D59BE4AFD00692FA160082E).
+/// ~1.9 MB, so only appended when the user opts in.
+pub const WEBVIEW2_BOOTSTRAP: &[u8] = include_bytes!("../assets/webview2-bootstrapper.exe");
+
 #[derive(Serialize, Debug, PartialEq)]
 pub struct ExportResult {
     /// What the user should distribute or run.
@@ -27,13 +34,23 @@ pub struct ExportResult {
     pub kind: String,
 }
 
-/// Assemble the mode-A byte stream: `[shell][zip][config][footer]`.
-/// Pure so the footer layout stays unit-tested independently of the
-/// filesystem.
-pub fn assemble_single(shell: &[u8], game_zip: &[u8], config_json: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(shell.len() + game_zip.len() + config_json.len() + FOOTER_LEN);
+/// Assemble the mode-A byte stream: `[shell][zip][runtime?][config][footer]`.
+/// The optional runtime blob (WebView2 auto-heal bootstrapper) sits
+/// directly before the config, whose `runtimeLen` field tells the
+/// shell where it is; the 16-byte footer is unchanged. Pure so the
+/// footer layout stays unit-tested independently of the filesystem.
+pub fn assemble_single(
+    shell: &[u8],
+    game_zip: &[u8],
+    runtime: &[u8],
+    config_json: &[u8],
+) -> Vec<u8> {
+    let mut out = Vec::with_capacity(
+        shell.len() + game_zip.len() + runtime.len() + config_json.len() + FOOTER_LEN,
+    );
     out.extend_from_slice(shell);
     out.extend_from_slice(game_zip);
+    out.extend_from_slice(runtime);
     out.extend_from_slice(config_json);
     out.extend_from_slice(&(config_json.len() as u32).to_le_bytes());
     out.extend_from_slice(&(game_zip.len() as u32).to_le_bytes());
@@ -129,7 +146,7 @@ mod tests {
         let zip = b"PK\x03\x04payload".to_vec();
         let config = br#"{"title":"t"}"#.to_vec();
 
-        let out = assemble_single(&shell, &zip, &config);
+        let out = assemble_single(&shell, &zip, &[], &config);
 
         assert!(out.starts_with(&shell));
         let footer_at = out.len() - FOOTER_LEN;
@@ -142,6 +159,40 @@ mod tests {
         let zip_start = out.len() - FOOTER_LEN - config_len - zip_len;
         assert_eq!(&out[zip_start..zip_start + zip.len()], &zip[..]);
         assert_eq!(&out[zip_start + zip.len()..zip_start + zip.len() + config_len], &config[..]);
+    }
+
+    #[test]
+    fn autoheal_layout_puts_runtime_before_config() {
+        let shell = b"MZ-fake-shell".to_vec();
+        let zip = b"PK\x03\x04payload".to_vec();
+        let runtime = b"MZ-fake-bootstrapper-exe".to_vec();
+        let config = br#"{"title":"t","webview2":"autoheal","runtimeLen":24}"#.to_vec();
+
+        let out = assemble_single(&shell, &zip, &runtime, &config);
+
+        let footer_at = out.len() - FOOTER_LEN;
+        let config_len = u32::from_le_bytes(out[footer_at..footer_at + 4].try_into().unwrap()) as usize;
+        let zip_len = u32::from_le_bytes(out[footer_at + 4..footer_at + 8].try_into().unwrap()) as usize;
+        assert_eq!(config_len, config.len());
+        assert_eq!(zip_len, zip.len());
+
+        // Runtime blob directly before the config; zip before that.
+        let runtime_start = footer_at - config_len - runtime.len();
+        let zip_start = runtime_start - zip.len();
+        assert_eq!(&out[runtime_start..footer_at - config_len], &runtime[..], "runtime sits directly before config");
+        assert_eq!(&out[zip_start..zip_start + zip.len()], &zip[..], "zip sits directly before runtime");
+        assert_eq!(&out[footer_at - config_len..footer_at], &config[..], "config is the last blob before the footer");
+    }
+
+    #[test]
+    fn vendored_bootstrapper_looks_like_an_exe() {
+        assert_eq!(&WEBVIEW2_BOOTSTRAP[..2], b"MZ", "PE header");
+        assert!(
+            WEBVIEW2_BOOTSTRAP.len() > 1_000_000,
+            "bootstrapper size sanity: {}",
+            WEBVIEW2_BOOTSTRAP.len()
+        );
+        assert!(WEBVIEW2_BOOTSTRAP.len() < u32::MAX as usize, "footer lengths are u32");
     }
 
     #[test]

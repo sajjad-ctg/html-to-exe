@@ -69,7 +69,7 @@ fn full_export_produces_a_runnable_exe() {
     let config = br#"{"title":"E2E Game","width":640,"height":480,"resizable":true,"fullscreen":false,"entry":"index.html"}"#;
     let patched_shell = std::fs::read(&out).expect("re-read patched shell");
     let game = make_test_zip();
-    let payload = assemble_single(&patched_shell, &game, config);
+    let payload = assemble_single(&patched_shell, &game, &[], config);
     std::fs::write(&out, payload).expect("assemble");
 
     // 4. structural checks on the final bytes
@@ -100,6 +100,47 @@ fn full_export_produces_a_runnable_exe() {
         let _ = child.kill();
         let _ = child.wait();
     }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn autoheal_export_carries_the_real_bootstrapper() {
+    // Structural check only (no launch): an auto-heal export must have
+    // the vendored Microsoft bootstrapper sitting directly before the
+    // config, exactly where the shell's `runtimeLen` lookup expects it.
+    let dir = temp_root();
+    let out = dir.join("e2e-autoheal.exe");
+    write_new(&out, SHELL_TEMPLATE).expect("copy shell template");
+
+    let runtime = builder_lib::export::WEBVIEW2_BOOTSTRAP;
+    assert_eq!(&runtime[..2], b"MZ", "vendored bootstrapper is a PE");
+
+    let config = format!(
+        r#"{{"title":"Autoheal E2E","webview2":"autoheal","runtimeLen":{}}}"#,
+        runtime.len()
+    );
+    let game = make_test_zip();
+    let payload = assemble_single(SHELL_TEMPLATE, &game, runtime, config.as_bytes());
+    std::fs::write(&out, payload).expect("assemble");
+
+    let bytes = std::fs::read(&out).unwrap();
+    let footer_at = bytes.len() - FOOTER_LEN;
+    assert_eq!(&bytes[footer_at + 8..], MAGIC);
+
+    let config_len = u32::from_le_bytes(bytes[footer_at..footer_at + 4].try_into().unwrap()) as usize;
+    let zip_len = u32::from_le_bytes(bytes[footer_at + 4..footer_at + 8].try_into().unwrap()) as usize;
+    assert_eq!(config_len, config.len());
+    assert_eq!(zip_len, game.len());
+
+    let runtime_start = footer_at - config_len - runtime.len();
+    assert_eq!(
+        &bytes[runtime_start..runtime_start + 2],
+        b"MZ",
+        "bootstrapper MZ header at the expected offset"
+    );
+    assert_eq!(&bytes[runtime_start..footer_at - config_len], runtime, "bootstrapper bytes intact");
+    assert_eq!(&bytes[runtime_start - zip_len..runtime_start], &game[..], "zip rides before runtime");
 
     let _ = std::fs::remove_dir_all(&dir);
 }

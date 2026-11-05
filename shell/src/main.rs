@@ -10,19 +10,27 @@ mod extract;
 mod hash;
 mod mime;
 mod protocol;
+mod runtime;
 mod webview;
 
 fn main() {
     if let Err(error) = launch() {
-        // TODO: native error dialog instead of stderr (invisible for
-        // double-clicked exes) — planned as part of v1 polish.
-        eprintln!("html-to-exe shell error:\n{error:#}");
+        // Players launch by double-clicking; stderr is invisible there,
+        // so every launch error must greet through a native dialog.
+        runtime::show_error(&format!("{error:#}"));
         std::process::exit(1);
     }
 }
 
 fn launch() -> anyhow::Result<()> {
     let source = embed::Source::resolve()?;
+
+    // Before anything heavy: make sure the game can actually run.
+    // Auto-heal exports install the WebView2 runtime here (with one
+    // consent dialog) if it is missing.
+    let runtime = source.runtime();
+    runtime::ensure(&source.config().webview2, runtime)?;
+
     let (content, data_dir) = source.content_and_data()?;
     webview::run(source.config(), &content, data_dir)
 }

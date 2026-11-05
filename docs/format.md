@@ -1,18 +1,20 @@
 # Exported exe binary format
 
-A single-file export (mode A) is the **shell binary** with two blobs
-appended to its end, terminated by a 16-byte footer:
+A single-file export (mode A) is the **shell binary** with two or three
+blobs appended to its end, terminated by a 16-byte footer:
 
 ```
-bytes:        0 ──────────────── A ────────── B ────────── C
-content:      │ zip │ config.json │ zip_len │ config_len │ magic │
-sizes:        Z                   4         4            8
+bytes:        0 ──────────────── A ────────── B ─────────── C ────── D
+content:      │ zip │ runtime? │ config.json │ zip_len │ config_len │ magic │
+sizes:        Z      R                        4         4            8
 ```
 
 | Region | Meaning |
 |---|---|
-| `0 .. C-16` | The original shell exe, unmodified. |
-| `C-16-Z-config_len .. C-16-Z` | Game archive (zip, deflate or stored). || `C-16-config_len .. C-16` | `config.json` (UTF-8, no BOM). See `shell/src/config.rs`. |
+| `0 .. D-16` | The original shell exe, unmodified. |
+| `C-Z-R .. C-Z` | Game archive (zip, deflate or stored). |
+| `C-Z-R` region, length `R` | Optional WebView2 auto-heal bootstrapper (empty for `webview2: "system"` exports). |
+| `B .. C` (last `config_len` bytes before the footer) | `config.json` (UTF-8, no BOM). See `shell/src/config.rs`. |
 | last 4 bytes before magic | `zip_len` — u32, little endian, `Z` |
 | before that, 4 bytes | `config_len` — u32, little endian |
 | last 8 bytes | magic `HTEX1\0\0\0` |
@@ -21,9 +23,21 @@ sizes:        Z                   4         4            8
   scanning, so a zip containing the magic phrase can never confuse it.
 - `config.json` fields and their defaults live in `shell/src/config.rs`.
   Unknown fields are ignored, malformed JSON falls back to defaults.
+- **Runtime blob (v1.2, "Auto-heal")**: with `webview2: "autoheal"`, the
+  config carries `"runtimeLen": R` (u64) and the vendored Microsoft
+  WebView2 Evergreen bootstrapper occupies `R` bytes directly *before*
+  the config. The blob's length must therefore be discoverable without
+  knowing its size first — which is why the config (not the runtime)
+  sits last before the footer: the footer supplies `config_len`, the
+  config supplies `runtimeLen`, and everything else follows arithmetically.
+  The 16-byte footer is unchanged from v0.1, so older tools that only
+  know zip/config parsing still work on system exports, which are
+  byte-identical to the v0.1 format.
 - Folder mode (mode B) uses **no footer at all**; the same shell binary
   with a `game/` folder and optional `config.json` next to it is a
-  working export by itself.
+  working export by itself. Folder exports never carry a runtime blob
+  (documented limitation); their shell still detects a missing runtime
+  and points at the official download page instead of dying silently.
 
 ## Versioning
 

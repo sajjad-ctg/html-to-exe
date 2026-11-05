@@ -33,6 +33,7 @@ function App() {
   const [title, setTitle] = useState("");
   const [iconPath, setIconPath] = useState("");
   const [mode, setMode] = useState("single"); // single | folder
+  const [webview2, setWebview2] = useState("system"); // system | autoheal
   const [status, setStatus] = useState("idle"); // idle | building | done | error
   const [statusDetail, setStatusDetail] = useState("");
   const [resultPath, setResultPath] = useState("");
@@ -103,6 +104,7 @@ function App() {
         title: title.trim(),
         iconPath: iconPath || null,
         mode,
+        webview2,
         onProgress: progress,
       });
       setStatus("done");
@@ -199,6 +201,27 @@ function App() {
               onClick={() => setMode("folder")}
             >
               Folder
+            </button>
+          </div>
+        </div>
+
+        {/* WebView2 runtime policy */}
+        <div class="field">
+          <span class="field-label">WebView2 runtime</span>
+          <div class="segmented">
+            <button
+              class={webview2 === "system" ? "seg active" : "seg"}
+              onClick={() => setWebview2("system")}
+              title="Rely on the WebView2 runtime already installed on the player's Windows (default; almost never missing)"
+            >
+              System (default)
+            </button>
+            <button
+              class={webview2 === "autoheal" ? "seg active" : "seg"}
+              onClick={() => setWebview2("autoheal")}
+              title="Embed Microsoft's official bootstrapper (~2 MB): if a player's Windows is missing the runtime, the game offers a one-time silent install instead of failing"
+            >
+              Auto-heal (+~2 MB)
             </button>
           </div>
         </div>
