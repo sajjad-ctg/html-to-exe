@@ -11,7 +11,7 @@
 //! skipped (Windows picks the nearest available entry) except that the
 //! smallest entry is always present so the group is never empty.
 
-use image::{imageops, DynamicImage, GenericImageView, ImageFormat, RgbaImage};
+use image::{imageops, GenericImageView, ImageFormat, RgbaImage};
 
 const SIZES: [u32; 6] = [256, 128, 64, 48, 32, 16];
 
@@ -147,6 +147,7 @@ fn encode_bmp(img: &RgbaImage) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use image::DynamicImage;
 
     fn square_png(size: u32) -> Vec<u8> {
         let mut img = RgbaImage::new(size, size);

@@ -90,7 +90,12 @@ pub fn inspect_zip_file(path: &str) -> Result<ZipInfo, String> {
 
 /// Default window config for every v1 export; window settings become
 /// configurable in v2 (see README roadmap).
-fn build_config(title: &str, entry: &str) -> Vec<u8> {
+///
+/// `webview2` is "" (system-only) or "autoheal"; `runtime_len` is the
+/// byte length of the bootstrapper blob sitting directly before this
+/// config in a single-file export (0 for folder exports — documented
+/// limitation, the shell then points at the official download page).
+fn build_config(title: &str, entry: &str, webview2: &str, runtime_len: u64) -> Vec<u8> {
     let config = serde_json::json!({
         "title": title.trim(),
         "width": 1280,
@@ -98,6 +103,8 @@ fn build_config(title: &str, entry: &str) -> Vec<u8> {
         "resizable": true,
         "fullscreen": false,
         "entry": entry,
+        "webview2": webview2,
+        "runtimeLen": runtime_len,
     });
     serde_json::to_vec(&config).expect("config is valid json")
 }
@@ -116,11 +123,15 @@ pub fn export_zip(
     title: &str,
     icon_path: Option<&str>,
     mode: &str,
+    webview2: &str,
     out_dir: Option<&Path>,
     progress: impl Fn(&str),
 ) -> Result<ExportResult, String> {
     if !matches!(mode, "single" | "folder") {
         return Err(format!("unknown mode '{mode}'"));
+    }
+    if !matches!(webview2, "system" | "autoheal") {
+        return Err(format!("unknown WebView2 runtime '{webview2}'"));
     }
     if title.trim().is_empty() {
         return Err("title must not be empty".into());
@@ -177,11 +188,16 @@ pub fn export_zip(
         }
 
         progress("attaching game archive");
-        let config_json = build_config(title, &entry);
+
+        // Auto-heal: the vendored Microsoft bootstrapper rides in the
+        // payload; its length lands in the config so the shell can
+        // find it (docs/format.md). System exports carry nothing.
+        let runtime: &[u8] = if webview2 == "autoheal" { export::WEBVIEW2_BOOTSTRAP } else { &[] };
+        let config_json = build_config(title, &entry, webview2, runtime.len() as u64);
 
         // Re-read: after patching, the on-disk bytes are the true shell.
         let patched_shell = std::fs::read(&out).map_err(|e| format!("re-read: {e}"))?;
-        let payload = assemble_single(&patched_shell, &zip_bytes, &config_json);
+        let payload = assemble_single(&patched_shell, &zip_bytes, runtime, &config_json);
         std::fs::write(&out, payload).map_err(|e| format!("write: {e}"))?;
 
         progress("done");
@@ -204,7 +220,10 @@ pub fn export_zip(
         std::fs::create_dir(&game_dir).map_err(|e| format!("mkdir: {e}"))?;
         extract_game(&zip_bytes, &game_dir)?;
 
-        let config_json = build_config(title, &entry);
+        // Runtime blob is a single-file-feature: folder exports carry
+        // no blob, so runtimeLen stays 0 (shell gracefully falls back
+        // to pointing at the official download page if ever needed).
+        let config_json = build_config(title, &entry, webview2, 0);
         write_new(&export_dir.join("config.json"), &config_json)?;
 
         progress("done");
@@ -222,10 +241,11 @@ async fn export(
     title: String,
     icon_path: Option<String>,
     mode: String,
+    webview2: String,
     on_progress: tauri::ipc::Channel<String>,
 ) -> Result<ExportResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        export_zip(&zip_path, &title, icon_path.as_deref(), &mode, None, |message| {
+        export_zip(&zip_path, &title, icon_path.as_deref(), &mode, &webview2, None, |message| {
             on_progress.send(message.to_string()).ok();
         })
     })

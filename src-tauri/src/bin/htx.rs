@@ -7,7 +7,8 @@
 //! Usage:
 //! ```
 //! htx inspect <zip>
-//! htx export <zip> --title <TITLE> [--icon <ico>] [--mode single|folder] [--out <DIR>]
+//! htx export <zip> --title <TITLE> [--icon <ico>] [--mode single|folder]
+//!                [--webview2 system|autoheal] [--out <DIR>]
 //! ```
 
 use std::path::PathBuf;
@@ -15,7 +16,8 @@ use std::path::PathBuf;
 fn usage() -> ! {
     eprintln!("usage:");
     eprintln!("  htx inspect <zip>");
-    eprintln!("  htx export <zip> --title <TITLE> [--icon <ICO>] [--mode single|folder] [--out <DIR>]");
+    eprintln!("  htx export <zip> --title <TITLE> [--icon <ICO>] [--mode single|folder]");
+    eprintln!("                   [--webview2 system|autoheal] [--out <DIR>]");
     std::process::exit(2);
 }
 
@@ -51,6 +53,7 @@ fn run_export(rest: &[String]) -> ! {
     let mut title = String::new(); // falls back to zip file name if unset
     let mut icon: Option<String> = None;
     let mut mode = String::from("single");
+    let mut webview2 = String::from("system");
     let mut out_dir: Option<PathBuf> = None;
 
     let mut flags = rest.iter().skip(1);
@@ -65,6 +68,7 @@ fn run_export(rest: &[String]) -> ! {
             "--title" => title = value("--title"),
             "--icon" => icon = Some(value("--icon")),
             "--mode" => mode = value("--mode"),
+            "--webview2" => webview2 = value("--webview2"),
             "--out" => out_dir = Some(PathBuf::from(value("--out"))),
             _ => usage(),
         }
@@ -80,7 +84,7 @@ fn run_export(rest: &[String]) -> ! {
             .to_string();
     }
 
-    let result = builder_lib::export_zip(&zip, &title, icon.as_deref(), &mode, out_dir.as_deref(), |step| {
+    let result = builder_lib::export_zip(&zip, &title, icon.as_deref(), &mode, &webview2, out_dir.as_deref(), |step| {
         println!("> {step}");
     });
     match result {

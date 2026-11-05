@@ -36,7 +36,8 @@ exes open at 1280×720, resizable, with F11 fullscreen.
 - [x] **v1** — Windows builder, both output modes, title + icon settings, zip validation
 - [x] **Early** — `htx` CLI (`inspect` / `export`), to support the demo export flow (was planned for v2)
 - [x] **v1.1** — Accept `.png` icons (auto-resize to 256/128/64/48/32/16 and pack into an ICO alongside `.ico` passthrough)
-- [ ] **v1.2** — Fully standalone (bundled WebView2) build option
+- [x] **v1.2** — Auto-heal WebView2: exports can embed Microsoft's official bootstrapper (+~2 MB), so a player missing the runtime gets a one-time silent install instead of a dead exe
+- [ ] **v1.3** — Fully standalone (embedded-offline runtime) build option
 - [ ] **v2** — Window settings (resolution, borderless), splash screen, then code-signing support as the capstone
 - [ ] **v3** — macOS / Linux exports
 

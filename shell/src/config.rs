@@ -22,6 +22,15 @@ pub struct GameConfig {
     pub fullscreen: bool,
     /// Path of the HTML entry file, relative to the zip root.
     pub entry: String,
+    /// WebView2 runtime policy: "" (system only) or "autoheal"
+    /// (an embedded Microsoft bootstrapper rides at the end of the
+    /// payload and can install the runtime on first launch).
+    pub webview2: String,
+    /// Length in bytes of the runtime blob sitting directly before
+    /// this config in the exe (docs/format.md). 0 = absent.
+    /// camelCase to match the JSON the builder writes.
+    #[serde(rename = "runtimeLen")]
+    pub runtime_len: u64,
 }
 
 impl Default for GameConfig {
@@ -33,6 +42,8 @@ impl Default for GameConfig {
             resizable: true,
             fullscreen: false,
             entry: String::from(DEFAULT_ENTRY),
+            webview2: String::new(),
+            runtime_len: 0,
         }
     }
 }
