@@ -30,3 +30,13 @@ sizes:        Z                   4         4            8
 The magic's `1` is the format revision. Future revisions must keep
 detection byte-compatible (same trailing 8 bytes) and either keep the
 files or refuse loudly in a visible dialog — never fail silently.
+
+## Code signing note (open question for a later milestone)
+
+Authenticode signatures hash PE content, and this format appends the
+payload at the end of the file — trailing bytes may fall inside or
+outside the hash range depending on where `signtool` placed the
+certificate table. When code signing is implemented, verify
+`signtool verify /pa` on an appended-and-then-signed file **and** on a
+signed-then-appended file before committing to a pipeline order. Do
+not assume: determine empirically, then record the outcome here.
