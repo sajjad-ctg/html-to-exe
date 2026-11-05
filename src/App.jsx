@@ -85,7 +85,7 @@ function App() {
   async function pickIcon() {
     const picked = await open({
       multiple: false,
-      filters: [{ name: "Windows icon", extensions: ["ico"] }],
+      filters: [{ name: "Windows icon (ico / png)", extensions: ["ico", "png"] }],
     });
     if (picked) setIconPath(picked);
   }
@@ -172,7 +172,7 @@ function App() {
         {/* icon */}
         <div class="field-row">
           <label class="field grow">
-            <span class="field-label">Icon (.ico, optional)</span>
+            <span class="field-label">Icon (.png / .ico, optional)</span>
             <button class="pick" onClick={pickIcon} title={iconPath}>
               {iconPath ? iconPath.split(/[\\/]/).pop() : "choose file…"}
             </button>

@@ -100,6 +100,13 @@ fn group_blob(images: &[IcoImage]) -> Vec<u8> {
     blob
 }
 
+/// Replace the exe's icon resources with the images from a `.ico`
+/// file on disk. Convenience wrapper over `patch_icon_bytes`.
+pub fn patch_icon(exe: &Path, ico: &Path) -> Result<(), String> {
+    let bytes = std::fs::read(ico).map_err(|e| format!("cannot read icon: {e}"))?;
+    patch_icon_bytes(exe, &bytes)
+}
+
 /// Resource id encoded as an MAKEINTRESOURCE-style pointer.
 fn pc_resource(id: u32) -> PCWSTR {
     PCWSTR(id as usize as *const u16)
@@ -110,10 +117,11 @@ fn to_wide(text: &Path) -> Vec<u16> {
     text.as_os_str().encode_wide().chain(std::iter::once(0)).collect()
 }
 
-/// Replace the exe's icon resources. `ico` must be a readable .ico file.
-pub fn patch_icon(exe: &Path, ico: &Path) -> Result<(), String> {
-    let ico_bytes = std::fs::read(ico).map_err(|e| format!("cannot read icon: {e}"))?;
-    let images = parse_ico(&ico_bytes)?;
+/// Replace the exe's icon resources with the images inside `ico`
+/// bytes. Accepts any well-formed multi-image desktop .ico container
+/// (hand-written or produced by `png2ico`).
+pub fn patch_icon_bytes(exe: &Path, ico: &[u8]) -> Result<(), String> {
+    let images = parse_ico(ico)?;
     let group = group_blob(&images);
 
     let exe_wide = to_wide(exe);

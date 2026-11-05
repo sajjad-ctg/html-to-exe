@@ -33,6 +33,7 @@ flate2 = { version = "1", default-features = true }
 # Icon resource patching (BeginUpdateResource/UpdateResource/EndUpdateResource)
 windows = { version = "0.62", features = ["Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
 tauri-plugin-dialog = "2"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
