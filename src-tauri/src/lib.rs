@@ -2,13 +2,13 @@
 
 pub mod export;
 pub mod iconpatch;
+pub mod png2ico;
 
 use serde::Serialize;
 use std::io::{BufReader, Cursor, Read, Seek};
 use std::path::Path;
 
 use export::{assemble_single, extract_game, unique_candidate, write_new, ExportResult};
-use iconpatch::patch_icon;
 
 /// Result of validating a chosen zip archive. `entry` is `None` until a
 /// usable `index.html` sits at the zip root or one folder down.
@@ -143,6 +143,26 @@ pub fn export_zip(
 
     let base = export::slugify(title);
     let exists = |p: &Path| p.exists();
+
+    // Icon source: memory only from here. A .png is converted to a
+    // packed multi-size .ico first; a .ico passes through untouched.
+    let icon_bytes: Option<Vec<u8>> = match icon_path {
+        Some(p) => {
+            progress("embedding icon");
+            let raw = std::fs::read(p).map_err(|e| format!("cannot read icon: {e}"))?;
+            let is_png = Path::new(p)
+                .extension()
+                .map(|ext| ext.to_string_lossy().eq_ignore_ascii_case("png"))
+                .unwrap_or(false);
+            Some(if is_png {
+                png2ico::png_to_ico(&raw)?
+            } else {
+                raw
+            })
+        }
+        None => None,
+    };
+
     progress("writing shell");
 
     if mode == "single" {
@@ -152,9 +172,8 @@ pub fn export_zip(
         // which would relocate an appended footer — so patch first,
         // assemble + append payload second.
         write_new(&out, export::SHELL_TEMPLATE)?;
-        if let Some(icon) = icon_path {
-            progress("embedding icon");
-            patch_icon(&out, Path::new(icon))?;
+        if let Some(bytes) = &icon_bytes {
+            iconpatch::patch_icon_bytes(&out, bytes)?;
         }
 
         progress("attaching game archive");
@@ -176,9 +195,8 @@ pub fn export_zip(
 
         let exe = export_dir.join(format!("{base}.exe"));
         write_new(&exe, export::SHELL_TEMPLATE)?;
-        if let Some(icon) = icon_path {
-            progress("embedding icon");
-            patch_icon(&exe, Path::new(icon))?;
+        if let Some(bytes) = &icon_bytes {
+            iconpatch::patch_icon_bytes(&exe, bytes)?;
         }
 
         progress("extracting game");
