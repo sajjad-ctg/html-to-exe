@@ -254,7 +254,7 @@ function App() {
 
       <footer class="foot">
         <span>MIT · free &amp; open source</span>
-        <span>v0.1.0</span>
+        <span>v0.2.0</span>
       </footer>
     </main>
   );

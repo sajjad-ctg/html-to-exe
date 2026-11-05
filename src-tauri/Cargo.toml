@@ -1,6 +1,6 @@
 [package]
 name = "html-to-exe-builder"
-version = "0.1.0"
+version = "0.2.0"
 description = "Convert HTML5 game/app zips into portable Windows exes"
 authors = ["Mohammad Sajjad Khan (MSKCTG)"]
 edition = "2024"
