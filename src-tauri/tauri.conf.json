@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "html-to-exe",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "identifier": "com.mskctg.htmltoexe",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -14,9 +14,9 @@
       {
         "title": "html-to-exe",
         "width": 680,
-        "height": 560,
+        "height": 660,
         "minWidth": 560,
-        "minHeight": 460,
+        "minHeight": 560,
         "resizable": true
       }
     ],

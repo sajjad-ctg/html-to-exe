@@ -236,6 +236,23 @@ function App() {
               Offline (exes ~300 MB)
             </button>
           </div>
+          {webview2 === "system" && (
+            <p class="field-note">
+              The small, safe default: the exe leans on the WebView2 runtime that Windows already ships
+              (built into Windows 11, and on nearly all updated Windows 10 PCs from Edge). No extra
+              download, no embedded payload — the exported game stays a few MB. In the rare case a player's
+              PC has no runtime at all, the game points to Microsoft's official download page instead of
+              failing silently.
+            </p>
+          )}
+          {webview2 === "autoheal" && (
+            <p class="field-note">
+              Adds Microsoft's official bootstrapper to your exe (+~2 MB). If a player's Windows somehow
+              lacks the WebView2 runtime, the game asks once, installs it quietly in the background (a
+              one-time internet download straight from Microsoft), and continues straight into the game —
+              they never see a dead exe.
+            </p>
+          )}
           {webview2 === "offline" && (
             <p class="field-note">
               For offline exports the builder downloads Microsoft's runtime once (~300 MB) and embeds it in your
@@ -273,8 +290,8 @@ function App() {
       </section>
 
       <footer class="foot">
-        <span>MIT · free &amp; open source</span>
-        <span>v0.3.0</span>
+        <span>MIT · free &amp; open source · by MSKCTG</span>
+        <span>v0.3.1</span>
       </footer>
     </main>
   );
