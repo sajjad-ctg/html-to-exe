@@ -2,11 +2,12 @@
 
 pub mod export;
 pub mod iconpatch;
+pub mod offline;
 pub mod png2ico;
 
+// The Read + Seek bounds below are explicit; import both traits.
 use serde::Serialize;
-use std::io::{BufReader, Cursor, Read, Seek};
-use std::path::Path;
+use std::io::{BufReader, Cursor, Read, Seek};use std::path::Path;
 
 use export::{assemble_single, extract_game, unique_candidate, write_new, ExportResult};
 
@@ -130,8 +131,13 @@ pub fn export_zip(
     if !matches!(mode, "single" | "folder") {
         return Err(format!("unknown mode '{mode}'"));
     }
-    if !matches!(webview2, "system" | "autoheal") {
+    if !matches!(webview2, "system" | "autoheal" | "offline") {
         return Err(format!("unknown WebView2 runtime '{webview2}'"));
+    }
+    if webview2 == "offline" && mode == "folder" {
+        // Folder exports cannot carry the offline blob this milestone
+        // (mode B has no footer to fence it). UI hides the option too.
+        return Err("offline runtime is only available for single-file exports".into());
     }
     if title.trim().is_empty() {
         return Err("title must not be empty".into());
@@ -189,15 +195,23 @@ pub fn export_zip(
 
         progress("attaching game archive");
 
-        // Auto-heal: the vendored Microsoft bootstrapper rides in the
-        // payload; its length lands in the config so the shell can
-        // find it (docs/format.md). System exports carry nothing.
-        let runtime: &[u8] = if webview2 == "autoheal" { export::WEBVIEW2_BOOTSTRAP } else { &[] };
+        // Runtime blob policy: system → nothing; autoheal → the
+        // ~2 MB vendored bootstrapper; offline → the Fixed Version
+        // runtime zip, downloaded and cached by the builder on first
+        // use (its own progress messages flow through here).
+        let runtime: Vec<u8> = match webview2 {
+            "offline" => {
+                let zip = offline::ensure_runtime_zip(&progress)?;
+                std::fs::read(&zip).map_err(|e| format!("read {}: {e}", zip.display()))?
+            }
+            "autoheal" => export::WEBVIEW2_BOOTSTRAP.to_vec(),
+            _ => Vec::new(),
+        };
         let config_json = build_config(title, &entry, webview2, runtime.len() as u64);
 
         // Re-read: after patching, the on-disk bytes are the true shell.
         let patched_shell = std::fs::read(&out).map_err(|e| format!("re-read: {e}"))?;
-        let payload = assemble_single(&patched_shell, &zip_bytes, runtime, &config_json);
+        let payload = assemble_single(&patched_shell, &zip_bytes, &runtime, &config_json);
         std::fs::write(&out, payload).map_err(|e| format!("write: {e}"))?;
 
         progress("done");
