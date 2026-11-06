@@ -162,6 +162,28 @@ mod tests {
     }
 
     #[test]
+    fn offline_payload_splits_with_runtime_blob() {
+        // Regression: offline exports were parsed with runtime_len = 0,
+        // so zip_start fell inside the runtime blob, the PK check failed
+        // and the shell ended in folder mode's error dialog — a hang
+        // with no visible window.
+        let zip = b"PK\x03\x04the game".to_vec();
+        let fixed_runtime = b"PK\x03\x04fixed-version-runtime".to_vec();
+        let config_json = br#"{"title":"offline","webview2":"offline","runtimeLen":25}"#;
+        let mut body = b"pretend-shell-exe".to_vec();
+        body.extend(&zip);
+        body.extend(&fixed_runtime);
+        body.extend(config_json);
+        body.extend(footer(config_json.len() as u32, zip.len() as u32));
+
+        let (config, game, runtime) = split_embedded(&body).expect("should parse");
+        assert_eq!(config.title, "offline");
+        assert_eq!(config.webview2, "offline");
+        assert_eq!(game, zip);
+        assert_eq!(runtime, fixed_runtime);
+    }
+
+    #[test]
     fn runtime_claimed_but_absent_is_rejected() {
         let zip = b"PK\x03\x04game".to_vec();
         // runtimeLen larger than the file could ever hold
@@ -242,7 +264,7 @@ fn split_embedded(exe_body: &[u8]) -> Option<(GameConfig, Vec<u8>, Vec<u8>)> {
     let config = GameConfig::from_json(
         &String::from_utf8_lossy(&body[config_start..footer_at]),
     );
-    let runtime_len = if config.webview2 == "autoheal" {
+    let runtime_len = if config.webview2 == "autoheal" || config.webview2 == "offline" {
         usize::try_from(config.runtime_len).ok()?
     } else {
         0

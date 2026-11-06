@@ -33,7 +33,7 @@ function App() {
   const [title, setTitle] = useState("");
   const [iconPath, setIconPath] = useState("");
   const [mode, setMode] = useState("single"); // single | folder
-  const [webview2, setWebview2] = useState("system"); // system | autoheal
+  const [webview2, setWebview2] = useState("system"); // system | autoheal | offline
   const [status, setStatus] = useState("idle"); // idle | building | done | error
   const [statusDetail, setStatusDetail] = useState("");
   const [resultPath, setResultPath] = useState("");
@@ -214,16 +214,36 @@ function App() {
               onClick={() => setWebview2("system")}
               title="Rely on the WebView2 runtime already installed on the player's Windows (default; almost never missing)"
             >
-              System (default)
+              System
             </button>
             <button
               class={webview2 === "autoheal" ? "seg active" : "seg"}
               onClick={() => setWebview2("autoheal")}
-              title="Embed Microsoft's official bootstrapper (~2 MB): if a player's Windows is missing the runtime, the game offers a one-time silent install instead of failing"
+              title="Embed Microsoft's official bootstrapper (+~2 MB): if a player's Windows is missing the runtime, the game offers a one-time silent install instead of failing"
             >
               Auto-heal (+~2 MB)
             </button>
+            <button
+              class={webview2 === "offline" ? "seg active" : "seg"}
+              disabled={mode === "folder"}
+              onClick={() => setWebview2("offline")}
+              title={
+                mode === "folder"
+                  ? "Offline runtime works with single-file exports only"
+                  : "Embed Microsoft's WebView2 runtime inside the exe (makes it big). Works on any Windows, no internet, nothing to install. Single-file exports only."
+              }
+            >
+              Offline (exes ~300 MB)
+            </button>
           </div>
+          {webview2 === "offline" && (
+            <p class="field-note">
+              For offline exports the builder downloads Microsoft's runtime once (~300 MB) and embeds it in your
+              game. The exported exe will be big (~300 MB or more) — but it just runs anywhere, no internet and no
+              setup needed, ever. The first launch on a PC missing the runtime takes 30–60 seconds to prepare; after
+              that it starts like any game. Choose Auto-heal (+~2 MB) if you prefer small exes with a one-click setup.
+            </p>
+          )}
         </div>
 
         <button class="build" disabled={!canBuild || status === "building"} onClick={build}>
@@ -254,7 +274,7 @@ function App() {
 
       <footer class="foot">
         <span>MIT · free &amp; open source</span>
-        <span>v0.2.0</span>
+        <span>v0.3.0</span>
       </footer>
     </main>
   );

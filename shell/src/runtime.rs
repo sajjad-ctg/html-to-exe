@@ -10,7 +10,12 @@
 //!    auto-heal bootstrapper (`webview2: "autoheal"`), asks the
 //!    player once, then installs it silently in the background and
 //!    continues into the game;
-//! 3. when there is no embedded bootstrapper, offers the official
+//! 3. when it is missing and the export carries the Fixed Version
+//!    runtime (`webview2: "offline"`), extracts the embedded runtime
+//!    zip into the cache and points WebView2 at it via the
+//!    Microsoft-documented `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` env
+//!    var — no dialog, no install, works without internet;
+//! 4. when there is no embedded anything, offers the official
 //!    download page instead of dying invisibly.
 //!
 //! All dialogs are native so they work before any window exists.
@@ -46,6 +51,9 @@ enum Path {
     Ready,
     /// Missing, but this export can self-install → heal.
     HealSupported,
+    /// Missing, but the export carries an offline Fixed Version
+    /// runtime → extract it and point WebView2 at it.
+    RunEmbedded,
     /// Missing and nothing embedded → point at the download page.
     HealNotCarried,
 }
@@ -55,6 +63,8 @@ fn decide(runtime_installed: bool, mode: &str, has_blob: bool) -> Path {
         Path::Ready
     } else if has_blob && mode == "autoheal" {
         Path::HealSupported
+    } else if has_blob && mode == "offline" {
+        Path::RunEmbedded
     } else {
         Path::HealNotCarried
     }
@@ -97,10 +107,24 @@ fn is_runtime_installed() -> bool {
 
 /// `pv: String` read helper (winreg returns Err inline already).
 
-/// Ensure a usable WebView2 runtime, healing via the embedded
-/// bootstrapper when available. Blocks until resolved; errors mean
-/// the game cannot start yet and the message is player-readable.
-pub fn ensure(config_webview2: &str, runtime: Option<&[u8]>) -> Result<()> {
+/// File name inside the Fixed Version runtime package that must exist
+/// after extraction for the runtime to be usable.
+const RUNTIME_MARKER: &str = "msedgewebview2.exe";
+
+/// Microsoft-documented env var for pointing WebView2 at a Fixed
+/// Version runtime folder (set before the webview is created).
+const BROWSER_FOLDER_ENV: &str = "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER";
+
+/// Ensure a usable WebView2 runtime: system runtime first, then the
+/// embedded bootstrapper, then the embedded Fixed Version runtime.
+/// Blocks until resolved; errors mean the game cannot start yet and
+/// the message is player-readable. `cache` persists the offline
+/// runtime extraction across launches.
+pub fn ensure(
+    config_webview2: &str,
+    runtime: Option<&[u8]>,
+    cache: &crate::extract::Cache,
+) -> Result<()> {
     let installed = installed_version().is_some();
     match decide(installed, config_webview2, runtime.is_some()) {
         Path::Ready => Ok(()),
@@ -108,8 +132,41 @@ pub fn ensure(config_webview2: &str, runtime: Option<&[u8]>) -> Result<()> {
             let blob = runtime.expect("decide() only returns HealSupported with runtime");
             heal(blob)
         }
+        Path::RunEmbedded => {
+            let blob = runtime.expect("decide() only returns RunEmbedded with runtime");
+            run_embedded(blob, cache)
+        }
         Path::HealNotCarried => point_to_download(),
     }
+}
+
+/// Extract the embedded Fixed Version runtime blob (a zip) into the
+/// cache and tell WebView2 to use it instead of the system runtime.
+/// Deliberately silent: the exe was sized to carry the runtime so
+/// players never see (or need) an install.
+fn run_embedded(blob: &[u8], cache: &crate::extract::Cache) -> Result<()> {
+    let root = cache.ensure_runtime(blob)?;
+
+    if !root.join(RUNTIME_MARKER).is_file() {
+        if is_runtime_installed() {
+            // Cache is somehow broken; a healthy system runtime is a
+            // better experience than a hard error.
+            return Ok(());
+        }
+        return Err(anyhow!(
+            "the embedded runtime is damaged ({} missing).\n\n\
+             Please re-download the game.\n\
+             The runtime can also be installed manually from:{DOWNLOAD_PAGE}",
+            RUNTIME_MARKER
+        ));
+    }
+
+    unsafe {
+        // Single-threaded at this point, and the value must survive
+        // into WebView2's environment creation — no races possible.
+        std::env::set_var(BROWSER_FOLDER_ENV, &root);
+    }
+    Ok(())
 }
 
 /// Confirm once, run the embedded bootstrapper elevated and silently,
@@ -254,7 +311,7 @@ mod tests {
 
     #[test]
     fn ready_when_installed_regardless_of_mode() {
-        for mode in ["", "autoheal"] {
+        for mode in ["", "autoheal", "offline"] {
             assert!(matches!(decide(true, mode, false), Path::Ready));
             assert!(matches!(decide(true, mode, true), Path::Ready));
         }
@@ -266,5 +323,11 @@ mod tests {
         assert!(matches!(decide(false, "autoheal", false), Path::HealNotCarried));
         assert!(matches!(decide(false, "", true), Path::HealNotCarried));
         assert!(matches!(decide(false, "", false), Path::HealNotCarried));
+    }
+
+    #[test]
+    fn missing_runtime_uses_embedded_offline_runtime() {
+        assert!(matches!(decide(false, "offline", true), Path::RunEmbedded));
+        assert!(matches!(decide(false, "offline", false), Path::HealNotCarried));
     }
 }

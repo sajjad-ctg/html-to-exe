@@ -1,6 +1,6 @@
 [package]
 name = "html-to-exe-builder"
-version = "0.2.0"
+version = "0.3.0"
 description = "Convert HTML5 game/app zips into portable Windows exes"
 authors = ["Mohammad Sajjad Khan (MSKCTG)"]
 edition = "2024"
@@ -34,6 +34,9 @@ flate2 = { version = "1", default-features = true }
 windows = { version = "0.62", features = ["Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
 tauri-plugin-dialog = "2"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
+# Offline-runtime fetch: download Microsoft's Fixed Version cab (ureq
+# uses rustls; no openssl linkage, keeps the builder dependency-light).
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

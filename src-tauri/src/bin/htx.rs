@@ -8,7 +8,7 @@
 //! ```
 //! htx inspect <zip>
 //! htx export <zip> --title <TITLE> [--icon <ico>] [--mode single|folder]
-//!                [--webview2 system|autoheal] [--out <DIR>]
+//!                [--webview2 system|autoheal|offline] [--out <DIR>]
 //! ```
 
 use std::path::PathBuf;
@@ -17,7 +17,7 @@ fn usage() -> ! {
     eprintln!("usage:");
     eprintln!("  htx inspect <zip>");
     eprintln!("  htx export <zip> --title <TITLE> [--icon <ICO>] [--mode single|folder]");
-    eprintln!("                   [--webview2 system|autoheal] [--out <DIR>]");
+    eprintln!("                   [--webview2 system|autoheal|offline] [--out <DIR>]");
     std::process::exit(2);
 }
 

@@ -37,7 +37,7 @@ exes open at 1280×720, resizable, with F11 fullscreen.
 - [x] **Early** — `htx` CLI (`inspect` / `export`), to support the demo export flow (was planned for v2)
 - [x] **v1.1** — Accept `.png` icons (auto-resize to 256/128/64/48/32/16 and pack into an ICO alongside `.ico` passthrough)
 - [x] **v1.2** — Auto-heal WebView2: exports can embed Microsoft's official bootstrapper (+~2 MB), so a player missing the runtime gets a one-time silent install instead of a dead exe
-- [ ] **v1.3** — Fully standalone (embedded-offline runtime) build option
+- [x] **v1.3** — Fully standalone (embedded-offline runtime) build option: the builder downloads Microsoft's Fixed Version WebView2 runtime once and embeds it in the exe (+~300 MB); on a PC missing the runtime the game extracts it on first launch and runs with no internet and nothing to install
 - [ ] **v2** — Window settings (resolution, borderless), splash screen, then code-signing support as the capstone
 - [ ] **v3** — macOS / Linux exports
 
