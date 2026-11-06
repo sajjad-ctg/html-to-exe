@@ -44,24 +44,36 @@ impl Cache {
     /// previous extraction when the archive content matches.
     pub fn ensure(&self, game: &[u8]) -> Result<PathBuf> {
         let content = self.root.join("content");
-        let digest = self.root.join("content.digest");
-        let current = fnv1a_hex(game);
+        self.extract_hashed(game, &content, "content.digest")
+    }
 
-        if current == fs::read_to_string(&digest).unwrap_or_default() && content.is_dir() {
-            return Ok(content);
+    /// Materialize the embedded Fixed Version runtime blob (zip) as
+    /// extracted runtime folder, reusing a previous extraction when
+    /// the blob matches (first launch pays the one-time cost).
+    pub fn ensure_runtime(&self, blob: &[u8]) -> Result<PathBuf> {
+        let run = self.root.join("webview2-runtime");
+        self.extract_hashed(blob, &run, "webview2-runtime.digest")
+    }
+
+    fn extract_hashed(&self, bytes: &[u8], into: &Path, digest_name: &str) -> Result<PathBuf> {
+        let digest = self.root.join(digest_name);
+        let current = fnv1a_hex(bytes);
+
+        if current == fs::read_to_string(&digest).unwrap_or_default() && into.is_dir() {
+            return Ok(into.to_path_buf());
         }
 
-        if content.is_dir() {
-            fs::remove_dir_all(&content)
-                .with_context(|| format!("cannot clear stale cache {}", content.display()))?;
+        if into.is_dir() {
+            fs::remove_dir_all(into)
+                .with_context(|| format!("cannot clear stale cache {}", into.display()))?;
         }
 
-        extract_zip(game, &content)?;
+        extract_zip(bytes, into)?;
 
         let mut fd = fs::File::create(&digest).context("cannot write cache marker")?;
         fd.write_all(current.as_bytes())?;
 
-        Ok(content)
+        Ok(into.to_path_buf())
     }
 }
 

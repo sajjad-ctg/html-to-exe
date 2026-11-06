@@ -24,12 +24,13 @@ fn main() {
 
 fn launch() -> anyhow::Result<()> {
     let source = embed::Source::resolve()?;
+    let cache = extract::Cache::new()?;
 
     // Before anything heavy: make sure the game can actually run.
-    // Auto-heal exports install the WebView2 runtime here (with one
-    // consent dialog) if it is missing.
-    let runtime = source.runtime();
-    runtime::ensure(&source.config().webview2, runtime)?;
+    // Auto-heal installs the missing runtime here (one consent dialog);
+    // offline exports extract their embedded runtime instead. This may
+    // set WEBVIEW2_BROWSER_EXECUTABLE_FOLDER for the webview below.
+    runtime::ensure(&source.config().webview2, source.runtime(), &cache)?;
 
     let (content, data_dir) = source.content_and_data()?;
     webview::run(source.config(), &content, data_dir)
