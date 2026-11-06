@@ -1,6 +1,6 @@
 [package]
 name = "html-to-exe-shell"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 license = "MIT"
 description = "Portable WebView2 shell that hosts embedded HTML5 games/apps."
