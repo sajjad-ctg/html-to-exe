@@ -29,8 +29,10 @@ The builder gains a third WebView2 runtime option: **Offline (exes ~300 MB)**. I
 
 | Artifact | Use |
 |---|---|
-| `html-to-exe_0.3.1_x64-setup.exe` | The builder app (double-click to install) |
+| `html-to-exe_0.3.1_x64-setup.exe` | Builder installer (double-click to install, Start-menu shortcut) |
+| `html-to-exe_0.3.1_x64_portable.zip` | Portable builder — unzip and double-click `html-to-exe-builder.exe`, no install |
 | `htx-x86_64-pc-windows-msvc.exe` | Portable CLI (`htx inspect` / `htx export`), no install |
+| `html-to-exe_0.3.1_x64_en-US.msi` | MSI installer for managed/enterprise deployment |
 
 CLI export example:
 
